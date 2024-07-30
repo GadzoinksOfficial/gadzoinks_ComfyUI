@@ -124,7 +124,7 @@ class SaveImageGadzoinks:
                 "extra" : extra
             }
             jd = json.dumps(form_data)
-            url = "https://kcd4tcn593.execute-api.us-east-1.amazonaws.com/ProdV1//webupload"
+            url = "https://e6h2r5adh8.execute-api.us-east-1.amazonaws.com/prod/webupload"
             resp = requests.post(url, data=jd)
             #dprint(f"response:{resp}")
             j = resp.json()
@@ -163,7 +163,7 @@ class SaveImageGadzoinks:
         handle = post.get("handle")
         authkey = post.get("authkey")
         dprint(f"{handle} {authkey}")
-        the_rest_url = "https://kcd4tcn593.execute-api.us-east-1.amazonaws.com/ProdV1/"       
+        the_rest_url =  "https://e6h2r5adh8.execute-api.us-east-1.amazonaws.com/prod/"
         headers = {'Accept': 'application/json', 'content-type':'application/json',
             'X-Gadzoink-handle':handle,  'X-Gadzoink-auth':authkey}
         resp = requests.post(the_rest_url + 'getparameters',json={}, headers=headers,data = {})
