@@ -2,6 +2,79 @@ import { $el } from "../../scripts/ui.js";
 import { api } from "../../scripts/api.js";
 import { app } from "../../scripts/app.js";
 import { getPngMetadata, getWebpMetadata, importA1111, getLatentMetadata } from "../../scripts/pnginfo.js";
+import { ComfyWidgets } from "../../scripts/widgets.js";
+
+const extensionData = {
+    handle: null,
+    authkey: null
+};
+app.registerExtension({
+    name: "gadzoinks.settings",
+    
+    async init(app) {
+		console.log("Setting up Gadzoinks extension");
+        
+        // Initialize extensionData if it doesn't exist
+        if (typeof window.gadzoinkExtensionData === 'undefined') {
+            window.gadzoinkExtensionData = {};
+        }
+        
+        // Fetch initial values
+        window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", "default_handle");
+        window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", "default_authkey");
+        
+		callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
+		
+        console.log("Initial handle:", window.gadzoinkExtensionData.handle);
+        console.log("Initial authkey:", window.gadzoinkExtensionData.authkey);
+        
+        // Add settings to UI
+        app.ui.settings.addSetting({
+            id: "Comfy.gadzoinks.handle",
+            name: "Gadzoinks Handle",
+            type: "text",
+            defaultValue: window.gadzoinkExtensionData.handle,
+            onChange: (newVal, oldVal) => {
+                this.setHandle(newVal);
+            }
+        });
+        
+        app.ui.settings.addSetting({
+            id: "Comfy.gadzoinks.authkey",
+            name: "Gadzoinks Authkey",
+            type: "text",
+            defaultValue: window.gadzoinkExtensionData.authkey,
+            onChange: (newVal, oldVal) => {
+                this.setAuthkey(newVal);
+            }
+        });
+		
+        console.log("Gadzoinks extension initialization completed");
+    },
+	
+	setHandle(v) {
+        window.gadzoinkExtensionData.handle = v;
+        console.log("Handle updated:", v);
+    },
+
+    setAuthkey(v) {
+        window.gadzoinkExtensionData.authkey = v;
+        console.log("Authkey updated:", v);
+    },
+	
+
+});
+// Function to call the custom endpoint
+async function callCustomHandler(handle, authkey) {
+    try {
+        const response = await api.fetchApi(`/gadzoinksX?handle=${encodeURIComponent(handle)}&authkey=${encodeURIComponent(authkey)}`);
+        console.log('callCustomHandler Success:', response);
+        return response;
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}
 
 const referenceButton = document.querySelector('#comfy-load-default-button');
 const newButton = $el("button", {
@@ -17,7 +90,7 @@ function gadzoinksShowAlert(event) {
 api.addEventListener("gadzoinks-show-alert",gadzoinksShowAlert);
 
 function dprint(...args) {
-  //console.log(...args);
+  console.log(...args);
 }
 
 // This is for debugging only , and is not used
@@ -35,7 +108,9 @@ const ext = {
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         // Run custom logic before a node definition is registered with the graph
         dprint("[logging]", "before register node: ", nodeType, nodeData);
-
+		callCustomHandler(app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", "default_handle"),
+			app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", "default_authkey"));
+        
         // This fires for every node definition so only log once
         //delete ext.beforeRegisterNodeDef;
     },
@@ -52,7 +127,6 @@ const ext = {
         //delete ext.nodeCreated;
     }
 }
-//app.registerExtension(ext);
 
 function printNameAttributes() {
   const allElements = document.getElementsByTagName("*");
@@ -131,21 +205,13 @@ function setNodeTypeWidget( type , name , value ) {
 
 async function gadzoinks_link() {
     try {
-        var handle = ""
-        var authkey = ""
-        for (const outerNode of app.graph.computeExecutionOrder(false)) {
-            if (outerNode.type == "Gadzoinks") {
-                const widgets = outerNode.widgets;
-                dprint("widgets",widgets)
-                for ( const w of widgets) {
-                    if (w.name=="handle") { handle = w.value; }
-                    if (w.name=="authkey") { authkey = w.value; }
-                }
-            }
-        }
+        //var handle = extensionData.handle
+        //var authkey = extensionData.authkey
+	var handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle")
+        var authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey")
         dprint("got:",handle,authkey)
-        if (handle.legth==0 || authkey.length == 0) {
-            alert("Could not find handle and authkey. Make sure you have a Gadzoinks node added and credentials entered");
+        if (isNullEmptyOrNone(handle) || isNullEmptyOrNone(authkey)) {
+            alert("Could not find handle and authkey. Make sure you have valid settings for Gadzoinks");
             return;
         }
         const body = new FormData();
@@ -157,15 +223,23 @@ async function gadzoinks_link() {
         dprint( "res:",res );
         dprint( "data:",data );
         const prompt = data["A1111_prompt"];
-        // const payload = data.get("payload",{} ); 
         const good = data.good;
         const message = data.message;
         if ( !good && message.length > 0 ) {
             alert(message);
             return
         }
-        dprint( "prompt:",prompt );
-        updateGraphInPlace(app.graph, prompt);
+console.log("data.comfyui:", data.comfyui);
+console.log("typeof data.comfyui:", typeof data.comfyui);
+	if (data.comfyui   && typeof data.comfyui === 'object' ) {
+	    dprint( data.comfyui );
+            app.graph.clear();
+            app.loadGraphData(data.comfyui );
+            app.graph.setDirtyCanvas(true, true);
+	} else {
+            dprint( "prompt:",prompt );
+            updateGraphInPlace(app.graph, prompt);
+        }
     } catch (error) {
         console.error(error);
     }
@@ -325,4 +399,13 @@ function setWidgetValue(node, name, value, isOptionPrefix) {
         w.value = value;
     }
 }
-
+function isNullEmptyOrNone(value) {
+    if (value === null || value === undefined) {
+        return true;
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim().toLowerCase();
+        return trimmed === '' || trimmed === 'none';
+    }
+    return false;
+}

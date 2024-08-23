@@ -27,47 +27,80 @@ import traceback
 
 routes = PromptServer.instance.routes
 
+class GlobalState:
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(GlobalState, cls).__new__(cls)
+            cls._instance.handle = ""
+            cls._instance.authkey = ""
+        return cls._instance
+        
+@PromptServer.instance.routes.get("/gadzoinksX")
+async def custom_get_handler(request):
+    dprint(f"custom_get_handler {request.rel_url.query}")
+    params = request.rel_url.query
+    global_state = GlobalState()
+    global_state.handle = params.get('handle')
+    global_state.authkey = params.get('authkey')
+    dprint(f"custom_get_handler: {global_state.handle}, {global_state.authkey}", flush=True)
+    return web.Response(text=f"Parameters received {params}")
+
+
 #WEB_DIRECTORY = "./js"
 
 def dprint(*args, sep=' ', end='\n', file=sys.stdout, flush=False):
+    #print(*args)
     pass
 
 class SaveImageGadzoinks:
     instance = None
     def __init__(self):
+        global_state = GlobalState()
         self.instance = self
         self.output_dir = folder_paths.get_output_directory()
         self.type = "output"
-        self.prefix_append = ""
-        self.compress_level = 4
-        #routes = web.RouteTableDef()
+        self.prefix_append = "gz"
+        self.compress_level = 1
         routes = PromptServer.instance.routes
         self.routes = routes
-        self.hanlde = None
-        self.authkey = None
+        self.handle = global_state.handle
+        self.authkey = global_state.authkey
+        dprint("__init__" ,flush=True)
+        
     @classmethod
     def INPUT_TYPES(s):
-        return { "required": 
-            {"handle": ("STRING",{}),"authkey": ("STRING",{}), 
-            "age": ("INT",{"default": 17, "min": 4, "max": 17}),
-            "private": ("INT",{"default": 0, "min": 0, "max": 1, "step": 1}), 
-            "images" : ("IMAGE", {}) },  
-        "hidden": {"prompt":"PROMPT","extra_pnginfo":"EXTRA_PNGINFO"},}        
+        return {
+            "required": {
+                 "upload_image":  ("BOOLEAN", {"default": True}),
+                 "private_storage":  ("BOOLEAN", {"default": False}),
+                 "age": (["17",  "12", "4" ],),
+                "images": ("IMAGE", {})
+            },
+            "hidden": {
+                "prompt": "PROMPT",
+                "extra_pnginfo": "EXTRA_PNGINFO"
+            }
+        }
 
     RETURN_TYPES = ()
     FUNCTION = "save_images_gadzoinks"
-
     OUTPUT_NODE = True
-
     CATEGORY = "Gadzoinks"
+    JAVASCRIPT = "gadzoinks.js"
 
-    def save_images_gadzoinks(self, handle,authkey, age, private, images, prompt=None, extra_pnginfo=None):
-        #dprint(f"testing")
-        self.handle = handle
-        self.authkey = authkey
+    def save_images_gadzoinks(self,upload_image , private_storage, age, images , prompt=None, extra_pnginfo=None):
+        global_state = GlobalState()
+        self.handle = global_state.handle
+        self.authkey = global_state.authkey
+        handle = global_state.handle
+        authkey = global_state.authkey
+        dprint(f"save_images_gadzoinks: handle: {self.handle}, authkey: {self.authkey}", flush=True)
         filename_prefix = ""
-        # support save metadata for latent sharing
         prompt_info = ""
+        if not upload_image:
+            return 
         if prompt is not None:
             prompt_info = json.dumps(prompt)
         metadata = None
@@ -77,7 +110,7 @@ class SaveImageGadzoinks:
                 for x in extra_pnginfo:
                     metadata[x] = json.dumps(extra_pnginfo[x])
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
-        filename = f".gz_{filename}"
+        filename = f"gz_{filename}"
         results = list()
         for (batch_number, image) in enumerate(images):
             i = 255. * image.cpu().numpy()
@@ -99,12 +132,15 @@ class SaveImageGadzoinks:
                 "subfolder": subfolder,
                 "type": self.type
             })
-            fage = 17
-            if age > 4 and age <=12 :
-                fage = 12
-            if age == 4:
-                fage = 4
-            vis = private
+            try:
+               age = age if age in {"4", "12", "17"} else "17"
+            except:
+                age = "17"
+            vis = 0
+            try:
+                vis = int(private_storage)
+            except:
+                pass
             extra = {}
             if prompt is not None:
                 extra = json.dumps(prompt)
@@ -115,7 +151,7 @@ class SaveImageGadzoinks:
                 "caption": "",
                 "prompt": "",
                 "nprompt": "",
-                "maturityRating": str(fage),
+                "maturityRating": age,
                 "ownerRanking": "0",
                 "fileName": file,
                 "fileType": "image/jpeg",
@@ -136,9 +172,6 @@ class SaveImageGadzoinks:
                 #dprint(f"url {url}")
                 fields = j["fields"]
                 #dprint( f"fields {fields}" )
-                #files = {'file': os.path.join(full_output_folder, file) }
-                #files = {'file': open( (full_output_folder, file, 'image/jpeg')}
-                #files = {'file': img. }
                 files = {'file':open(os.path.join(full_output_folder, file),"rb") }
                 #dprint(f"files:{files}")
                 http_response = requests.post(url, data=fields , files=files )
@@ -156,17 +189,23 @@ class SaveImageGadzoinks:
     def IS_CHANGED(s, images):
         return time.time()
 
+    @PromptServer.instance.routes.post("/gadzoinks/settings")
+    async def gadzoinks_settings(request):
+       json_data = await request.json()
+       PromptServer.instance.Comfy_gadzoinks_handle = json_data.get('handle')
+       PromptServer.instance.Comfy_gadzoinks_authkey = json_data.get('authkey')
+       return web.Response(text="Settings updated")
 
     @routes.post("/gadzoinks_link")
     async def gadzoinks_link(req):
         post = await req.post()
         handle = post.get("handle")
         authkey = post.get("authkey")
-        dprint(f"{handle} {authkey}")
+        dprint(f"handle:{handle} authkey:{authkey}")
         the_rest_url =  "https://e6h2r5adh8.execute-api.us-east-1.amazonaws.com/prod/"
         headers = {'Accept': 'application/json', 'content-type':'application/json',
             'X-Gadzoink-handle':handle,  'X-Gadzoink-auth':authkey}
-        resp = requests.post(the_rest_url + 'getparameters',json={}, headers=headers,data = {})
+        resp = requests.post(the_rest_url + 'getparameters',json={"handle":handle, "authkey": authkey, "workflow" : {"workflow_type" : "comfyui"} }, headers=headers)
         j = resp.json()
         dprint(f" status:{resp.status_code} j:{j}")
         good = False
@@ -182,7 +221,7 @@ class SaveImageGadzoinks:
             dprint(f"oops {j.get('message')}")
         else:
             message = "problem"
-            dprint(f"problem")
+            print(f"problem getting image details")
         p = ""
         if good:
             payload = j.get("payload")
@@ -204,56 +243,8 @@ class SaveImageGadzoinks:
                 p = p[:-1]
             dprint(f"p:{p}")
         dprint(f"gadzoinks_link {req}")
-        return web.json_response({"A1111_prompt":p,'good':good,'message':message,'payload':payload})
-
-'''
-
-routes = PromptServer.instance.routes
-@routes.post('/image_chooser_message')
-async def make_image_selection(request):
-    post = await request.post()
-    MessageHolder.addMessage(post.get("id"), post.get("message"))
-    return web.json_response({})
-
-class Cancelled(Exception):
-    pass
-
-class MessageHolder:
-    stash = {}
-    messages = {}
-    cancelled = False
-    
-    @classmethod
-    def addMessage(cls, id, message):
-        if message=='__cancel__':
-            cls.messages = {}
-            cls.cancelled = True
-        elif message=='__start__':
-            cls.messages = {}
-            cls.stash = {}
-            cls.cancelled = False
-        else:
-            cls.messages[str(id)] = message
-    
-    @classmethod
-    def waitForMessage(cls, id, period = 0.1, asList = False):
-        sid = str(id)
-        while not (sid in cls.messages) and not ("-1" in cls.messages):
-            if cls.cancelled:
-                cls.cancelled = False
-                raise Cancelled()
-            time.sleep(period)
-        if cls.cancelled:
-            cls.cancelled = False
-            raise Cancelled()
-        message = cls.messages.pop(str(id),None) or cls.messages.pop("-1")
-        try:
-            if asList:
-                return [int(x.strip()) for x in message.split(",")]
-            else:
-                return int(message.strip())
-        except ValueError:
-            dprint(f"ERROR IN IMAGE_CHOOSER - failed to parse '${message}' as ${'comma separated list of ints' if asList else 'int'}")
-            return [1] if asList else 1
-'''
+        rcj = {"A1111_prompt":p,'good':good,'message':message,'payload':payload }
+        if j.get('comfyui'):
+            rcj['comfyui'] = j.get('comfyui')	
+        return web.json_response(rcj)
 
