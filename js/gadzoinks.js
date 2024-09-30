@@ -1,4 +1,3 @@
-import { $el } from "../../scripts/ui.js";
 import { api } from "../../scripts/api.js";
 import { app } from "../../scripts/app.js";
 import { getPngMetadata, getWebpMetadata, importA1111, getLatentMetadata } from "../../scripts/pnginfo.js";
@@ -22,33 +21,34 @@ app.registerExtension({
         // Fetch initial values
         window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", "default_handle");
         window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", "default_authkey");
-        
-		callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
-		
+        callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
         console.log("Initial handle:", window.gadzoinkExtensionData.handle);
         console.log("Initial authkey:", window.gadzoinkExtensionData.authkey);
-        
         // Add settings to UI
         app.ui.settings.addSetting({
-            id: "Comfy.gadzoinks.handle",
+            id: "Gadzoinks.handle",
             name: "Gadzoinks Handle",
             type: "text",
             defaultValue: window.gadzoinkExtensionData.handle,
             onChange: (newVal, oldVal) => {
                 this.setHandle(newVal);
-            }
+            },
+            async onChange(value) {
+                await callCustomHandler(value,window.gadzoinkExtensionData.authkey);
+            },
         });
-        
         app.ui.settings.addSetting({
-            id: "Comfy.gadzoinks.authkey",
+            id: "Gadzoinks.authkey",
             name: "Gadzoinks Authkey",
-            type: "text",
+            type: "text", 
             defaultValue: window.gadzoinkExtensionData.authkey,
             onChange: (newVal, oldVal) => {
                 this.setAuthkey(newVal);
-            }
+            },
+            async onChange(value) {
+                await callCustomHandler(window.gadzoinkExtensionData.handle,value);
+            },
         });
-		
         console.log("Gadzoinks extension initialization completed");
     },
 	
@@ -67,7 +67,7 @@ app.registerExtension({
 // Function to call the custom endpoint
 async function callCustomHandler(handle, authkey) {
     try {
-        const response = await api.fetchApi(`/gadzoinksX?handle=${encodeURIComponent(handle)}&authkey=${encodeURIComponent(authkey)}`);
+        const response = await api.fetchApi(`/gadzoinks/setting?handle=${encodeURIComponent(handle)}&authkey=${encodeURIComponent(authkey)}`);
         console.log('callCustomHandler Success:', response);
         return response;
     } catch (error) {

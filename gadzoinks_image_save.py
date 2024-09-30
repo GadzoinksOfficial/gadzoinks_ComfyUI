@@ -37,7 +37,8 @@ class GlobalState:
             cls._instance.authkey = ""
         return cls._instance
         
-@PromptServer.instance.routes.get("/gadzoinksX")
+
+@PromptServer.instance.routes.get("/gadzoinks/setting")
 async def custom_get_handler(request):
     dprint(f"custom_get_handler {request.rel_url.query}")
     params = request.rel_url.query
@@ -51,7 +52,7 @@ async def custom_get_handler(request):
 #WEB_DIRECTORY = "./js"
 
 def dprint(*args, sep=' ', end='\n', file=sys.stdout, flush=False):
-    #print(*args)
+    #print(*args, sep=sep, end=end, file=file, flush=flush)
     pass
 
 class SaveImageGadzoinks:
