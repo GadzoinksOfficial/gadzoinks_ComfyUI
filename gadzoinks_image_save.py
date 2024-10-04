@@ -52,7 +52,7 @@ async def custom_get_handler(request):
 #WEB_DIRECTORY = "./js"
 
 def dprint(*args, sep=' ', end='\n', file=sys.stdout, flush=False):
-    #print(*args, sep=sep, end=end, file=file, flush=flush)
+    print(*args, sep=sep, end=end, file=file, flush=flush)
     pass
 
 class SaveImageGadzoinks:

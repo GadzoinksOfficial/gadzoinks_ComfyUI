@@ -2,6 +2,7 @@ import { api } from "../../scripts/api.js";
 import { app } from "../../scripts/app.js";
 import { getPngMetadata, getWebpMetadata, importA1111, getLatentMetadata } from "../../scripts/pnginfo.js";
 import { ComfyWidgets } from "../../scripts/widgets.js";
+import { createElement as $el, getClosestOrSelf, setAttributes } from "./utils_dom.js";
 
 const extensionData = {
     handle: null,
@@ -13,14 +14,35 @@ app.registerExtension({
     async init(app) {
 		console.log("Setting up Gadzoinks extension");
         
+	const referenceButton = document.querySelector('#comfy-load-default-button');
+	const newButton = $el("button", {
+	    id: "comfy-gadzoinks-load-button",
+	    onclick: async () => { gadzoinks_link(); }
+	    });
+	newButton.innerHTML ="🔗 Gadzoinks"
+	//newButton.className = "comfy-btn";
+	const referenceStyle = window.getComputedStyle(referenceButton);
+	newButton.style.cssText = `
+	            height: ${referenceStyle.height};
+	            line-height: ${referenceStyle.lineHeight};
+	            padding: ${referenceStyle.padding};
+	            font-size: ${referenceStyle.fontSize};
+	        `;
+	referenceButton.parentNode.insertBefore(newButton, referenceButton.nextSibling);
+
+	// referenceButton.insertAdjacentElement('afterend', newButton);
+	 console.log(referenceButton);
+	if (!referenceButton) {
+		console.log("referenceButton not found");
+	}
         // Initialize extensionData if it doesn't exist
         if (typeof window.gadzoinkExtensionData === 'undefined') {
             window.gadzoinkExtensionData = {};
         }
         
         // Fetch initial values
-        window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", "default_handle");
-        window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", "default_authkey");
+        window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Gadzoinks.handle", "default_handle");
+        window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Gadzoinks.authkey", "default_authkey");
         callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
         console.log("Initial handle:", window.gadzoinkExtensionData.handle);
         console.log("Initial authkey:", window.gadzoinkExtensionData.authkey);
@@ -30,10 +52,11 @@ app.registerExtension({
             name: "Gadzoinks Handle",
             type: "text",
             defaultValue: window.gadzoinkExtensionData.handle,
-            onChange: (newVal, oldVal) => {
-                this.setHandle(newVal);
-            },
             async onChange(value) {
+		    window.gadzoinkExtensionData.handle = value
+		            console.log("change handle handle:", window.gadzoinkExtensionData.handle);
+		            console.log("change handle authkey:", window.gadzoinkExtensionData.authkey);
+
                 await callCustomHandler(value,window.gadzoinkExtensionData.authkey);
             },
         });
@@ -43,16 +66,19 @@ app.registerExtension({
             type: "text", 
             defaultValue: window.gadzoinkExtensionData.authkey,
             onChange: (newVal, oldVal) => {
-                this.setAuthkey(newVal);
+                        console.log("auth on h:", window.gadzoinkExtensionData.handle);
+		            console.log("auth on a:", window.gadzoinkExtensionData.authkey);
             },
             async onChange(value) {
-                await callCustomHandler(window.gadzoinkExtensionData.handle,value);
+		    window.gadzoinkExtensionData.authkey = value
+                       console.log("auth h a:", window.gadzoinkExtensionData.handle);
+		            console.log("auth c a:", window.gadzoinkExtensionData.authkey);
+		    await callCustomHandler(window.gadzoinkExtensionData.handle,value);
             },
         });
         console.log("Gadzoinks extension initialization completed");
     },
-	
-	setHandle(v) {
+    setHandle(v) {
         window.gadzoinkExtensionData.handle = v;
         console.log("Handle updated:", v);
     },
@@ -76,13 +102,6 @@ async function callCustomHandler(handle, authkey) {
     }
 }
 
-const referenceButton = document.querySelector('#comfy-load-default-button');
-const newButton = $el("button", {
-    id: "gadzoinks-load-button",
-    textContent: "🔗 Gadzoinks",
-    onclick: async () => { gadzoinks_link(); }
-    });
-referenceButton.insertAdjacentElement('afterend', newButton);
 
 function gadzoinksShowAlert(event) {
     alert(event.detail.message);
@@ -207,8 +226,10 @@ async function gadzoinks_link() {
     try {
         //var handle = extensionData.handle
         //var authkey = extensionData.authkey
-	var handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle")
-        var authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey")
+	//var handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle")
+        //var authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey")
+	var handle =   window.gadzoinkExtensionData.handle
+	var authkey =  window.gadzoinkExtensionData.authkey
         dprint("got:",handle,authkey)
         if (isNullEmptyOrNone(handle) || isNullEmptyOrNone(authkey)) {
             alert("Could not find handle and authkey. Make sure you have valid settings for Gadzoinks");
