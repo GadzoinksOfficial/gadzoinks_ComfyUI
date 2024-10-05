@@ -52,7 +52,7 @@ async def custom_get_handler(request):
 #WEB_DIRECTORY = "./js"
 
 def dprint(*args, sep=' ', end='\n', file=sys.stdout, flush=False):
-    print(*args, sep=sep, end=end, file=file, flush=flush)
+    #print(*args, sep=sep, end=end, file=file, flush=flush)
     pass
 
 class SaveImageGadzoinks:
@@ -68,6 +68,8 @@ class SaveImageGadzoinks:
         self.routes = routes
         self.handle = global_state.handle
         self.authkey = global_state.authkey
+        self.set_timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+        self.set_name = None
         dprint("__init__" ,flush=True)
         
     @classmethod
@@ -77,6 +79,7 @@ class SaveImageGadzoinks:
                  "upload_image":  ("BOOLEAN", {"default": True}),
                  "private_storage":  ("BOOLEAN", {"default": False}),
                  "age": (["17",  "12", "4" ],),
+                 "set_name": ("STRING",),
                 "images": ("IMAGE", {})
             },
             "hidden": {
@@ -91,13 +94,20 @@ class SaveImageGadzoinks:
     CATEGORY = "Gadzoinks"
     JAVASCRIPT = "gadzoinks.js"
 
-    def save_images_gadzoinks(self,upload_image , private_storage, age, images , prompt=None, extra_pnginfo=None):
+    def save_images_gadzoinks(self,upload_image , private_storage, age,set_name, images , prompt=None, extra_pnginfo=None):
         global_state = GlobalState()
         self.handle = global_state.handle
         self.authkey = global_state.authkey
+        isNewSet = False
+        if set_name:
+            if set_name != self.set_name:
+                self.set_name = set_name
+                self.set_timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+                isNewSet = True
+                dprint("NEW SET")
         handle = global_state.handle
         authkey = global_state.authkey
-        dprint(f"save_images_gadzoinks: handle: {self.handle}, authkey: {self.authkey}", flush=True)
+        dprint(f"save_images_gadzoinks: handle: {self.handle}, authkey: {self.authkey}, set_name:{set_name} self.set_timestamp:{self.set_timestamp} isNewSet:{isNewSet}", flush=True)
         filename_prefix = ""
         prompt_info = ""
         if not upload_image:
@@ -148,6 +158,7 @@ class SaveImageGadzoinks:
             form_data = {
                 "handle": handle,
                 "authkey": authkey,
+                "set_timestring" : self.set_timestamp,
                 "keywords": "",
                 "caption": "",
                 "prompt": "",
@@ -160,6 +171,11 @@ class SaveImageGadzoinks:
                 "app" : "comfyui",
                 "extra" : extra
             }
+            if set_name:
+                form_data["set_name"] = set_name
+                if isNewSet:
+                    form_data["start_of_set"] = 1
+            dprint(f"form:{form_data}")
             jd = json.dumps(form_data)
             url = "https://e6h2r5adh8.execute-api.us-east-1.amazonaws.com/prod/webupload"
             resp = requests.post(url, data=jd)
@@ -218,10 +234,10 @@ class SaveImageGadzoinks:
                 good = True
             dprint("Good api call result")
         elif status == 204:
-            message = j.get('message','')+'. Try linking again on the app.'
+            message = j.get('message','')+'.\nIn the App, select an image and press 🔗 .'
             dprint(f"oops {j.get('message')}")
         else:
-            message = "problem"
+            message = "problem. Check your username and authkey in Settings ⚙️  / Gadzoinks"
             print(f"problem getting image details")
         p = ""
         if good:
