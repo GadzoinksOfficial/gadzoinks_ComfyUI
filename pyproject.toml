@@ -1,0 +1,14 @@
+[project]
+name = "gadzoinks_comfyui"
+description = "Custom node for integrating with gadzoinks iPhone app"
+version = "1.0.0"
+license = {file = "LICENSE"}
+
+[project.urls]
+Repository = "https://github.com/GadzoinksOfficial/gadzoinks_ComfyUI"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "gadzoinks_ComfyUI"
+Icon = ""
