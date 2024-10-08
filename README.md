@@ -11,8 +11,11 @@ In the App you will create an account (or subaccount) with a handle (username) a
 Then add the Gadzoinks node to your workflow, the same as you would add 'Save Image' node (you can use both to save locally and to gadzoinks cloud).
 
 Node Options
+
 upload image - if false don't upload . useful if you are just playing around
-private storage - your image will only be visible to you
+private storage - your image will only be visible to you.
+
 age - we ask that you rate your image 4,12,17 (G,PG,R)
+
 set_name - (optional) sets are used to organize a batch of images that are created together. In the app you can easily view just a set, mark the ones to keep and remove the rest with a click.
 
