@@ -9,6 +9,6 @@ Repository = "https://github.com/GadzoinksOfficial/gadzoinks_ComfyUI"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "gadzoinksofficial"
 DisplayName = "gadzoinks_ComfyUI"
 Icon = ""
