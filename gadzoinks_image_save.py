@@ -79,7 +79,7 @@ class SaveImageGadzoinks:
                  "upload_image":  ("BOOLEAN", {"default": True}),
                  "private_storage":  ("BOOLEAN", {"default": False}),
                  "age": (["17",  "12", "4" ],),
-                 "set_name": ("STRING",),
+                 "set_name": ("STRING",{"default":""}),
                 "images": ("IMAGE", {})
             },
             "hidden": {
