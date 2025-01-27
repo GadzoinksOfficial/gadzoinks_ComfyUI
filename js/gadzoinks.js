@@ -19,7 +19,7 @@ app.registerExtension({
 	    id: "comfy-gadzoinks-load-button",
 	    onclick: async () => { gadzoinks_link(); }
 	    });
-	newButton.innerHTML ="🔗 Gadzoinks"
+	newButton.innerHTML ="🔗 Gadzoinks";
 	//newButton.className = "comfy-btn";
 	const referenceStyle = window.getComputedStyle(referenceButton);
 	newButton.style.cssText = `
@@ -53,7 +53,7 @@ app.registerExtension({
             type: "text",
             defaultValue: window.gadzoinkExtensionData.handle,
             async onChange(value) {
-		    window.gadzoinkExtensionData.handle = value
+		    window.gadzoinkExtensionData.handle = value;
 		            console.log("change handle handle:", window.gadzoinkExtensionData.handle);
 		            console.log("change handle authkey:", window.gadzoinkExtensionData.authkey);
 
@@ -65,12 +65,8 @@ app.registerExtension({
             name: "Gadzoinks Authkey",
             type: "text", 
             defaultValue: window.gadzoinkExtensionData.authkey,
-            onChange: (newVal, oldVal) => {
-                        console.log("auth on h:", window.gadzoinkExtensionData.handle);
-		            console.log("auth on a:", window.gadzoinkExtensionData.authkey);
-            },
             async onChange(value) {
-		    window.gadzoinkExtensionData.authkey = value
+		    window.gadzoinkExtensionData.authkey = value;
                        console.log("auth h a:", window.gadzoinkExtensionData.handle);
 		            console.log("auth c a:", window.gadzoinkExtensionData.authkey);
 		    await callCustomHandler(window.gadzoinkExtensionData.handle,value);
@@ -106,7 +102,14 @@ async function callCustomHandler(handle, authkey) {
 function gadzoinksShowAlert(event) {
     alert(event.detail.message);
 }
+function gadzoinksGetAuth(event) {
+    const xh= app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", window.gadzoinkExtensionData.handle);
+    const xa = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", window.gadzoinkExtensionData.authkey);
+    console.error('gadzoinksGetAuth:',xh,xa);
+    const response = api.fetchApi(`/gadzoinks/setting?handle=${encodeURIComponent(xh)}&authkey=${encodeURIComponent(xa)}`);
+}
 api.addEventListener("gadzoinks-show-alert",gadzoinksShowAlert);
+api.addEventListener("gadzoinks-get-auth",gadzoinksGetAuth);
 
 function dprint(...args) {
   console.log(...args);
@@ -122,7 +125,7 @@ const ext = {
         // defs is a lookup core nodes, add yours into this
         dprint("[logging]", "add custom node definitions", "current nodes:", Object.keys(defs));
         //defs["Gadzoinks"]
-        dprint("[logging] Gadzoinks node:",defs["Gadzoinks"])
+        dprint("[logging] Gadzoinks node:",defs["Gadzoinks"]);
     },
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         // Run custom logic before a node definition is registered with the graph
@@ -145,7 +148,7 @@ const ext = {
         // This fires for every node so only log once
         //delete ext.nodeCreated;
     }
-}
+};
 
 function printNameAttributes() {
   const allElements = document.getElementsByTagName("*");
@@ -179,7 +182,7 @@ function getNodeTypeWidgetOptions( type , name ) {
     for (const outerNode of app.graph.computeExecutionOrder(false)) {
         if (outerNode.type == type) {
             const widgets = outerNode.widgets;
-            dprint("setNodeTypeWidget:",type,name,widgets)
+            dprint("setNodeTypeWidget:",type,name,widgets);
             for ( const w of widgets) {
                 if (w.name==name) {
                     return w.options;
@@ -195,7 +198,7 @@ function getNodeTypeWidget( type , name ) {
     for (const outerNode of app.graph.computeExecutionOrder(false)) {
         if (outerNode.type == type) {
             const widgets = outerNode.widgets;
-            dprint("setNodeTypeWidget:",type,name,widgets)
+            dprint("setNodeTypeWidget:",type,name,widgets);
             for ( const w of widgets) {
                 if (w.name==name) { 
                     return w.value;
@@ -211,7 +214,7 @@ function setNodeTypeWidget( type , name , value ) {
     for (const outerNode of app.graph.computeExecutionOrder(false)) {
         if (outerNode.type == type) {
             const widgets = outerNode.widgets;
-            dprint("setNodeTypeWidget:",type,name,widgets)
+            dprint("setNodeTypeWidget:",type,name,widgets);
             for ( const w of widgets) {
                 if (w.name==name) {  
                     w.value = value;
@@ -228,9 +231,9 @@ async function gadzoinks_link() {
         //var authkey = extensionData.authkey
 	//var handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle")
         //var authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey")
-	var handle =   window.gadzoinkExtensionData.handle
-	var authkey =  window.gadzoinkExtensionData.authkey
-        dprint("got:",handle,authkey)
+	var handle =   window.gadzoinkExtensionData.handle;
+	var authkey =  window.gadzoinkExtensionData.authkey;
+        dprint("got:",handle,authkey);
         if (isNullEmptyOrNone(handle) || isNullEmptyOrNone(authkey)) {
             alert("Could not find handle and authkey. Make sure you have valid settings for Gadzoinks");
             return;
@@ -248,7 +251,7 @@ async function gadzoinks_link() {
         const message = data.message;
         if ( !good && message.length > 0 ) {
             alert(message);
-            return
+            return;
         }
 console.log("data.comfyui:", data.comfyui);
 console.log("typeof data.comfyui:", typeof data.comfyui);
@@ -295,7 +298,7 @@ function updateGraphInPlace(graph,parameters) {
     let positive = parameters.substr(0, p2).trim();
     let negative = parameters.substring(p2 + 18, p).trim();
     const ceil64 = (v) => Math.ceil(v / 64) * 64;
-    dprint("updateGraphInPlace:",positive,negative,opts)
+    dprint("updateGraphInPlace:",positive,negative,opts);
 
     const ckptNode = LiteGraph.getNodeType("CheckpointLoaderSimple");
     const clipSkipNode = LiteGraph.getNodeType("CLIPSetLastLayer");
@@ -377,7 +380,7 @@ function updateGraphInPlace(graph,parameters) {
             handlers[opt](popOpt(opt));
         }
     }
-    const ksampler = getNodeType("KSampler")
+    const ksampler = getNodeType("KSampler");
     dprint("ksampler",ksampler);
     dprint("ksampler",ksampler.serialize());
     const kpos = ksampler.getInputNode( 1 );   // why is 1 the positive node. I guess (model,pos,neg,latentImage)
