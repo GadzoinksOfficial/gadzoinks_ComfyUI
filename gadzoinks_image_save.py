@@ -69,8 +69,9 @@ class GlobalState:
 #WEB_DIRECTORY = "./js"
 
 def dprint(*args, sep=' ', end='\n', file=sys.stdout, flush=True):
-    print(*args, sep=sep, end=end, file=file, flush=flush)
-    #logger.info(sep.join(map(str, args)))    
+    #print(*args, sep=sep, end=end, file=file, flush=flush)
+    #logger.info(sep.join(map(str, args)))
+    pass
 
 
 class SaveImageGadzoinks:
@@ -157,8 +158,14 @@ class SaveImageGadzoinks:
             else:
                 dprint(f"save_images_gadzoinks: Z1")
                 if not handle or not authkey:
-                    PromptServer.instance.send_sync("gadzoinks-show-alert",{"message":"Handle / Authkey not set, check settings."})
-                    return {}
+                    PromptServer.instance.send_sync("gadzoinks-get-auth",{})
+                    time.sleep(0.20) # prompt server is async, which will call python async
+                    handle = global_state.handle
+                    authkey = global_state.authkey
+                    dprint(f"save_images_gadzoinks: Z2   {handle} {authkey}")
+                    if not handle or not authkey:
+                        PromptServer.instance.send_sync("gadzoinks-show-alert",{"message":"Handle / Authkey not set, check settings."})
+                        return {}
         dprint(f"save_images_gadzoinks: USING handle: {handle}, authkey: {authkey} userToken:{userToken}")
         filename_prefix = ""
         prompt_info = ""

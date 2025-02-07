@@ -10,42 +10,49 @@ const extensionData = {
 };
 app.registerExtension({
     name: "gadzoinks.settings",
-    
+    async setup() {
+        console.log("Setting up Gadzoinks extension setup() ");
+        try {
+            // new style Manager buttons
+            let cmGroup = new (await import("../../scripts/ui/components/buttonGroup.js")).ComfyButtonGroup(
+                new(await import("../../scripts/ui/components/button.js")).ComfyButton({
+                     icon: "mdi mdi-link-variant",
+                     action: () => {
+                         gadzoinks_link();
+                     },
+                     tooltip: "Gadzoinks Link",
+                     content: "Gadzoinks",
+                     classList: "comfyui-button comfyui-menu-mobile-collapse primary"
+                }).element
+                );
+            app.menu?.settingsGroup.element.before(cmGroup.element);
+        }                                                              
+        catch(exception) {
+            console.log("ComfyUI is outdated. New style menu based features are disabled.");
+        }
+        // This is for old UI with Toolbar
+        const menu = document.querySelector(".comfy-menu");
+        const newButton = document.createElement("button");
+        newButton.textContent = "Gadzoinks 🔗";
+        newButton.onclick = () => {
+            gadzoinks_link();
+        };
+        menu.append(newButton);
+    },
     async init(app) {
-		console.log("Setting up Gadzoinks extension");
+		console.log("Setting up Gadzoinks extension init()");
         
-	const referenceButton = document.querySelector('#comfy-load-default-button');
-	const newButton = $el("button", {
-	    id: "comfy-gadzoinks-load-button",
-	    onclick: async () => { gadzoinks_link(); }
-	    });
-	newButton.innerHTML ="🔗 Gadzoinks";
-	//newButton.className = "comfy-btn";
-	const referenceStyle = window.getComputedStyle(referenceButton);
-	newButton.style.cssText = `
-	            height: ${referenceStyle.height};
-	            line-height: ${referenceStyle.lineHeight};
-	            padding: ${referenceStyle.padding};
-	            font-size: ${referenceStyle.fontSize};
-	        `;
-	referenceButton.parentNode.insertBefore(newButton, referenceButton.nextSibling);
-
-	// referenceButton.insertAdjacentElement('afterend', newButton);
-	 console.log(referenceButton);
-	if (!referenceButton) {
-		console.log("referenceButton not found");
-	}
         // Initialize extensionData if it doesn't exist
         if (typeof window.gadzoinkExtensionData === 'undefined') {
             window.gadzoinkExtensionData = {};
         }
         
         // Fetch initial values
-        window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Gadzoinks.handle", "default_handle");
-        window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Gadzoinks.authkey", "default_authkey");
+        window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Gadzoinks.handle");
+        window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Gadzoinks.authkey");
         callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
-        console.log("Initial handle:", window.gadzoinkExtensionData.handle);
-        console.log("Initial authkey:", window.gadzoinkExtensionData.authkey);
+        //console.log("Initial handle:", window.gadzoinkExtensionData.handle);
+        //console.log("Initial authkey:", window.gadzoinkExtensionData.authkey);
         // Add settings to UI
         app.ui.settings.addSetting({
             id: "Gadzoinks.handle",
@@ -53,26 +60,20 @@ app.registerExtension({
             type: "text",
             defaultValue: window.gadzoinkExtensionData.handle,
             async onChange(value) {
-		    window.gadzoinkExtensionData.handle = value;
-		            console.log("change handle handle:", window.gadzoinkExtensionData.handle);
-		            console.log("change handle authkey:", window.gadzoinkExtensionData.authkey);
-
-                await callCustomHandler(value,window.gadzoinkExtensionData.authkey);
-            },
+                window.gadzoinkExtensionData.handle = value;
+                await callCustomHandler(value, window.gadzoinkExtensionData.authkey);
+            }
         });
         app.ui.settings.addSetting({
             id: "Gadzoinks.authkey",
             name: "Gadzoinks Authkey",
-            type: "text", 
+            type: "text",
             defaultValue: window.gadzoinkExtensionData.authkey,
             async onChange(value) {
-		    window.gadzoinkExtensionData.authkey = value;
-                       console.log("auth h a:", window.gadzoinkExtensionData.handle);
-		            console.log("auth c a:", window.gadzoinkExtensionData.authkey);
-		    await callCustomHandler(window.gadzoinkExtensionData.handle,value);
-            },
+                window.gadzoinkExtensionData.authkey = value;
+                await callCustomHandler(window.gadzoinkExtensionData.handle, value);
+            }
         });
-        console.log("Gadzoinks extension initialization completed");
     },
     setHandle(v) {
         window.gadzoinkExtensionData.handle = v;
@@ -81,7 +82,6 @@ app.registerExtension({
 
     setAuthkey(v) {
         window.gadzoinkExtensionData.authkey = v;
-        console.log("Authkey updated:", v);
     },
 	
 
@@ -90,7 +90,6 @@ app.registerExtension({
 async function callCustomHandler(handle, authkey) {
     try {
         const response = await api.fetchApi(`/gadzoinks/setting?handle=${encodeURIComponent(handle)}&authkey=${encodeURIComponent(authkey)}`);
-        console.log('callCustomHandler Success:', response);
         return response;
     } catch (error) {
         console.error('Error:', error);
@@ -103,9 +102,10 @@ function gadzoinksShowAlert(event) {
     alert(event.detail.message);
 }
 function gadzoinksGetAuth(event) {
-    const xh= app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", window.gadzoinkExtensionData.handle);
-    const xa = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", window.gadzoinkExtensionData.authkey);
-    console.error('gadzoinksGetAuth:',xh,xa);
+    //const xh= app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", window.gadzoinkExtensionData.handle);
+    //const xa = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", window.gadzoinkExtensionData.authkey);
+    const xh= app.ui.settings.getSettingValue("Gadzoinks.handle" );
+    const xa = app.ui.settings.getSettingValue("Gadzoinks.authkey" );
     const response = api.fetchApi(`/gadzoinks/setting?handle=${encodeURIComponent(xh)}&authkey=${encodeURIComponent(xa)}`);
 }
 api.addEventListener("gadzoinks-show-alert",gadzoinksShowAlert);
@@ -125,13 +125,13 @@ const ext = {
         // defs is a lookup core nodes, add yours into this
         dprint("[logging]", "add custom node definitions", "current nodes:", Object.keys(defs));
         //defs["Gadzoinks"]
-        dprint("[logging] Gadzoinks node:",defs["Gadzoinks"]);
+        dprint("[logging] Gadzoinks node:",defs.Gadzoinks);
     },
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         // Run custom logic before a node definition is registered with the graph
         dprint("[logging]", "before register node: ", nodeType, nodeData);
-		callCustomHandler(app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", "default_handle"),
-			app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", "default_authkey"));
+		callCustomHandler(app.ui.settings.getSettingValue("Gadzoinks.handle"),
+			app.ui.settings.getSettingValue("Gadzoinks.authkey"));
         
         // This fires for every node definition so only log once
         //delete ext.beforeRegisterNodeDef;
@@ -231,8 +231,10 @@ async function gadzoinks_link() {
         //var authkey = extensionData.authkey
 	//var handle = app.ui.settings.getSettingValue("Comfy.gadzoinks.handle")
         //var authkey = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey")
-	var handle =   window.gadzoinkExtensionData.handle;
-	var authkey =  window.gadzoinkExtensionData.authkey;
+	//var handle =   window.gadzoinkExtensionData.handle;
+	//var authkey =  window.gadzoinkExtensionData.authkey;
+    var handle = app.ui.settings.getSettingValue("Gadzoinks.handle");
+    var authkey = app.ui.settings.getSettingValue("Gadzoinks.authkey");
         dprint("got:",handle,authkey);
         if (isNullEmptyOrNone(handle) || isNullEmptyOrNone(authkey)) {
             alert("Could not find handle and authkey. Make sure you have valid settings for Gadzoinks");
@@ -246,15 +248,13 @@ async function gadzoinks_link() {
         const data = await res.json();
         dprint( "res:",res );
         dprint( "data:",data );
-        const prompt = data["A1111_prompt"];
+        const prompt = data.A1111_prompt;
         const good = data.good;
         const message = data.message;
         if ( !good && message.length > 0 ) {
             alert(message);
             return;
         }
-console.log("data.comfyui:", data.comfyui);
-console.log("typeof data.comfyui:", typeof data.comfyui);
 	if (data.comfyui   && typeof data.comfyui === 'object' ) {
 	    dprint( data.comfyui );
             app.graph.clear();
