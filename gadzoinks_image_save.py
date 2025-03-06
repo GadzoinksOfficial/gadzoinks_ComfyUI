@@ -29,8 +29,11 @@ import traceback
 import nodes
 import glob
 
+import folder_paths
+
 base_path = os.path.dirname(os.path.realpath(__file__))
 models_dir = os.path.join(base_path, "models")
+user_dir = os.path.join(base_path, "user")
 routes = PromptServer.instance.routes
 _polltimer_registration_in_progress = False
 _registerAndSetInfo_registration_in_progress = False
@@ -65,8 +68,20 @@ class GlobalState:
             dprint(f"GlobalState cls._instance is None")
             cls()
         return cls._instance
+    
+    @classmethod
+    def dump(cls):
+        instance = cls.get_instance()
+        attrs = [
+            'handle', 'authkey', 'qservermode', 'enableAPI', 
+            'serverName', 'api_handle', 'api_authkey', 
+            'prompt_id', 'qserverid', 'machineID'   ]
+        max_length = max(len(attr) for attr in attrs)
+        for attr in attrs:
+            value = getattr(instance, attr)
+            dprint(f"{attr:<{max_length}} : {value}")
 
-#WEB_DIRECTORY = "./js"
+
 
 def dprint(*args, sep=' ', end='\n', file=sys.stdout, flush=True):
     #print(*args, sep=sep, end=end, file=file, flush=flush)
@@ -123,7 +138,9 @@ class SaveImageGadzoinks:
         dprint(f"save_images_gadzoinks dynprompt={dynprompt}")
         dprint(f"save_images_gadzoinks prompt={prompt}")
         dprint(f"save_images_gadzoinks extra_pnginfo={extra_pnginfo}")
-        
+        if not upload_image:
+            dprint(f"save_images_gadzoinks not upload_image")
+            return { "ui": { "images": list() } }
         
         #promptRC = PromptServer.instance.send_sync("gadzoinks-gadzoinks-current-prompt-id", {})
         #dprint(f"save_images_gadzoinks: promptRC:{promptRC} prompt_id:{global_state.prompt_id}")
@@ -156,23 +173,20 @@ class SaveImageGadzoinks:
                     authkey = job.get("authkey",authkey)
                     userToken = job.get('userToken')
             else:
-                dprint(f"save_images_gadzoinks: Z1")
+                dprint(f"save_images_gadzoinks: using handle/auth")
                 if not handle or not authkey:
                     PromptServer.instance.send_sync("gadzoinks-get-auth",{})
                     time.sleep(0.20) # prompt server is async, which will call python async
                     handle = global_state.handle
                     authkey = global_state.authkey
-                    dprint(f"save_images_gadzoinks: Z2   {handle} {authkey}")
+                    dprint(f"save_images_gadzoinks: queried front end for auth. {handle} {authkey}")
                     if not handle or not authkey:
                         PromptServer.instance.send_sync("gadzoinks-show-alert",{"message":"Handle / Authkey not set, check settings."})
                         return {}
         dprint(f"save_images_gadzoinks: USING handle: {handle}, authkey: {authkey} userToken:{userToken}")
         filename_prefix = ""
         prompt_info = ""
-        dprint(f"save_images_gadzoinks 10")
-        if not upload_image:
-            dprint(f"save_images_gadzoinks 11")
-            return
+       
         dprint(f"save_images_gadzoinks 15 {prompt}")
         if prompt is not None:
             #if prompt.get("uuid") is None:
@@ -297,7 +311,7 @@ class SaveImageGadzoinks:
     def IS_CHANGED(*args, **kwargs):
         return time.time()
     
-    
+    """
     # I think this is unused
     @PromptServer.instance.routes.post("/gadzoinks/settings")
     async def gadzoinks_settings(request):
@@ -307,7 +321,8 @@ class SaveImageGadzoinks:
         PromptServer.instance.Comfy_gadzoinks_authkey = json_data.get('authkey')
         
         return web.Response(text="Settings updated")
-
+    """
+    
     @PromptServer.instance.routes.get("/gadzoinks/setting")
     async def setting(request):
         # I'm putting machneID here since this is called pretty early on
@@ -333,7 +348,30 @@ class SaveImageGadzoinks:
     
         dprint(f"setting: {global_state.handle}, {global_state.authkey} serverName:{global_state.serverName} enableAPI:{global_state.enableAPI} qservermode:{global_state.qservermode} machineID={global_state.machineID}", flush=True)
         return web.Response(text=f"Parameters received {params}")
-
+    
+    # This code duplicates whats used in server.py, but intercepting was problematic
+    @PromptServer.instance.routes.get("/gadzoinks/models")
+    async def gadzoinks_model_types(request):
+        loadSettingsFromConfigFile()
+        global_state = GlobalState.get_instance()
+        if not global_state.enableAPI:
+            return web.json_response( {"status":403, "message" : "Not enabled"})
+        model_types = list(folder_paths.folder_names_and_paths.keys())
+        return web.json_response(model_types)
+        
+    @PromptServer.instance.routes.get("/gadzoinks/models/{folder}")  
+    async def gadzoinks_models(request):
+        loadSettingsFromConfigFile()
+        global_state = GlobalState.get_instance()
+        if not global_state.enableAPI:
+            return web.json_response( {"status":403, "message" : "Not enabled"})
+        folder = request.match_info.get("folder", None)
+        if not folder in folder_paths.folder_names_and_paths:
+            return web.Response(status=404)
+        files = folder_paths.get_filename_list(folder)
+        files = [file for file in files if not file.startswith('private')]
+        return web.json_response(files)
+    
     @PromptServer.instance.routes.get("/gadzoinks/listLoras")
     async def listLoras(request):
         global_state = GlobalState.get_instance()
@@ -359,9 +397,10 @@ class SaveImageGadzoinks:
     
     @PromptServer.instance.routes.post("/gadzoinks/prompt")
     async def gadzoinks_promptflow(req):
+        loadSettingsFromConfigFile()
         global_state = GlobalState.get_instance()
         if not global_state.enableAPI:
-            return web.json_response( {"status":403, "message" : "Not enabled"})
+            return web.json_response( {"status":403, "message" : "Not enabled","errcode":1})
         dprint(f"/gadzoinks/prompt ENTRY")
         global_state = GlobalState.get_instance()
         post = await req.post()
@@ -371,6 +410,8 @@ class SaveImageGadzoinks:
         workflow_type = body.get("workflow_type")
         prompt = body.get("prompt")
         dprint(f"gadzoinks_promptflow prompt:{prompt}")
+        if not prompt:
+            return web.json_response( {"status":403, "message" : "Bad Input","errcode":2})
         # {'prompt_id': 'ef427448-d79a-4c18-84e9-9c98366b3176', 'number': 5, 'node_errors': {}}
         rc = await queue_prompt(prompt)
         job = { "handle" :  body.get("handle") , "authkey" : body.get("authkey") }
@@ -380,9 +421,9 @@ class SaveImageGadzoinks:
         dprint(f"gadzoinks_promptflow  queue_prompt RC:{rc}")
         result = {}
         if rc:
-            result = {"prompt_id":rc["prompt_id"],"node_errors":rc["node_errors"],"status":200}
+            result = {"prompt_id":rc["prompt_id"],"node_errors":rc["node_errors"],"status":200,"errcode":0}
         else:
-            result = {"status":400, "message" : "Failed. Usually this means the server is missing a node that is in the workflow" }
+            result = {"status":400, "message" : "Failed. Usually this means the server is missing a node that is in the workflow","errcode":3 }
         # is this needed, sets web workflow - does it work?
         # PromptServer.instance.send_sync("gadzoinks-gadzoinks-workflow", body)
         return web.json_response(result)
@@ -403,6 +444,7 @@ class SaveImageGadzoinks:
     
     @PromptServer.instance.routes.get("/gadzoinks/polltimer")
     async def gadzoinks_polltimer(req):
+        loadSettingsFromConfigFile()
         try:
             global _polltimer_registration_in_progress
             global_state = GlobalState.get_instance()
@@ -441,6 +483,7 @@ class SaveImageGadzoinks:
 
     @routes.post("/gadzoinks/current_prompt_id")
     async def gadzoinks_current_prompt_id(req):
+        loadSettingsFromConfigFile()
         global_state = GlobalState.get_instance()
         post = await req.post()
         global_state.prompt_id = post.get("prompt_id")
@@ -448,6 +491,7 @@ class SaveImageGadzoinks:
         
     @routes.post("/gadzoinks_link")
     async def gadzoinks_link(req):
+        loadSettingsFromConfigFile()
         post = await req.post()
         handle = post.get("handle")
         authkey = post.get("authkey")
@@ -651,6 +695,7 @@ def list_files(root_path):
     try:
         root_depth = get_path_depth(root_path)
         root_path = os.path.normpath(root_path)
+        dprint(f"list_files  root_path:{root_path}")
         # For Windows, we need to handle symlinks differently
         if os.name == 'nt':
             import win32file
@@ -667,8 +712,8 @@ def list_files(root_path):
             dirpath = os.path.normpath(dirpath)
             current_depth = get_path_depth(dirpath)
             depth_difference = current_depth - root_depth
-            #dprint(f"dirpath:{dirpath} dirnames:{dirnames}, filenames:{filenames}")
-            #dprint(f"dirpath:{dirpath} current_depth:{current_depth} depth_difference:{depth_difference}")
+            dprint(f"dirpath:{dirpath} dirnames:{dirnames}, filenames:{filenames}")
+            dprint(f"dirpath:{dirpath} current_depth:{current_depth} depth_difference:{depth_difference}")
             dirnames[:] = [d for d in dirnames if not d.startswith('.')]
             for file in filenames:
                 if file.startswith('.'):
@@ -694,3 +739,67 @@ def list_files(root_path):
     except Exception as e:
         dprint(f"Exception {e}")
     return result
+
+def loadSettingsFromConfigFile():
+        """
+        if the website interface is stale or doesn't exist try and read from config file
+        """
+        user_directory = folder_paths.user_directory
+        dprint(f"user_directory:{user_directory}")
+        
+        global_state = GlobalState.get_instance()
+        if not global_state.handle:
+            try:
+                settings_path = os.path.join(user_directory, "default", "comfy.settings.json")
+                dprint(f"user_directory:{user_directory} settings_path:{settings_path}")
+                with open(settings_path, 'r') as file:
+                    comfySettings = json.load(file)
+                    if comfySettings:
+                        dprint(f"comfySettings; {comfySettings}")
+                        global_state.authkey = comfySettings.get("Gadzoinks.authkey")
+                        global_state.handle = comfySettings.get("Gadzoinks.handle")
+                        global_state.enableAPI = comfySettings.get("Gadzoinks.enableapi")
+                        global_state.qservermode = comfySettings.get("Gadzoinks.qservermode")
+                        global_state.serverName = comfySettings.get("Gadzoinks.serverName")
+                        
+                        global_state.dump()
+            except FileNotFoundError:
+                dprint("Settings file not found at ../../user/default/comfy.settings.json")
+            except json.JSONDecodeError:
+                dprint("Error parsing settings file - invalid JSON")
+                
+def find_route_handler(routes, method, path_pattern):
+    """
+    Find the handler function for a specific route pattern.
+    
+    Args:
+        routes: The routes object containing registered routes
+        method (str): HTTP method ('GET', 'POST', etc.)
+        path_pattern (str): URL path pattern to match
+        
+    Returns:
+        handler function if found, None otherwise
+    """
+    method = method.upper()
+    
+    def match_pattern(route_path, search_path):
+        route_segments = route_path.split('/')
+        search_segments = search_path.split('/')
+        
+        if len(route_segments) != len(search_segments):
+            return False
+            
+        for route_seg, search_seg in zip(route_segments, search_segments):
+            is_route_param = route_seg.startswith('{') and route_seg.endswith('}')
+            is_search_param = search_seg.startswith('{') and search_seg.endswith('}')
+            
+            if (is_route_param and is_search_param) or route_seg == search_seg:
+                continue
+            return False
+        return True
+
+    for route in routes._items:
+        if route.method == method and match_pattern(route.path, path_pattern):
+            return route.handler
+    return None
+

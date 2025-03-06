@@ -4,14 +4,62 @@ import { getPngMetadata, getWebpMetadata, importA1111, getLatentMetadata } from 
 import { ComfyWidgets } from "../../scripts/widgets.js";
 import { createElement as $el, getClosestOrSelf, setAttributes } from "./utils_dom.js";
 
+function dprint(...args) {
+  //console.log(...args);
+}
+
 const extensionData = {
     handle: null,
     authkey: null
 };
 app.registerExtension({
     name: "gadzoinks.settings",
+    settings: [
+        {
+            id: "Gadzoinks.authkey",
+            name: "Gadzoinks Authkey",
+            type: "text",
+            defaultValue: "",
+            category: ["Gadzoinks", "Account", "Authkey"],
+            async onChange(value) { setbackendVariables({authkey: value}); }
+        },
+        {
+            id: "Gadzoinks.handle",
+            name: "Gadzoinks Handle",
+            type: "text",
+            defaultValue: "",
+            category: ["Gadzoinks", "Account", "Handle"],
+            async onChange(value) { setbackendVariables({handle: value}); }
+        },
+         {
+            id: "Gadzoinks.enableapi",
+            name: "Gadzoinks Direct API",
+            tooltip: "Enable direct (local) connections from the App",
+            type: "boolean",
+            defaultValue: false,
+            category: ["Gadzoinks", "Features", "Gadzoinks Direct API"],
+            async onChange(value) { setbackendVariables({enableAPI: value}); }
+        }, 
+        {
+            id: "Gadzoinks.qservermode",
+            name: "Gadzoinks remote control",
+            tooltip: "Enable remote connections from the App",
+            type: "boolean",
+            defaultValue: false,
+            category: ["Gadzoinks", "Features", "Gadzoinks Remote Management"],
+            async onChange(value) { setbackendVariables({qservermode: value}); }
+        },
+        {
+            id: "Gadzoinks.serverName",
+            name: "Gadzoinks Server Name",
+            tooltip: "Name used with App [Restart after change]",
+            type: "text",
+            category: ["Gadzoinks", "Features", "Gadzoinks Server Name"],
+            async onChange(value) { setbackendVariables({serverName: value}); }
+        },
+    ],
     async setup() {
-        console.log("Setting up Gadzoinks extension setup() ");
+        console.log("Setting up Gadzoinks extension setup() foo");
         try {
             // new style Manager buttons
             let cmGroup = new (await import("../../scripts/ui/components/buttonGroup.js")).ComfyButtonGroup(
@@ -50,44 +98,14 @@ app.registerExtension({
         // Fetch initial values
         window.gadzoinkExtensionData.handle = app.ui.settings.getSettingValue("Gadzoinks.handle");
         window.gadzoinkExtensionData.authkey = app.ui.settings.getSettingValue("Gadzoinks.authkey");
-        callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
-        //console.log("Initial handle:", window.gadzoinkExtensionData.handle);
-        //console.log("Initial authkey:", window.gadzoinkExtensionData.authkey);
-        // Add settings to UI
-        app.ui.settings.addSetting({
-            id: "Gadzoinks.handle",
-            name: "Gadzoinks Handle",
-            type: "text",
-            defaultValue: window.gadzoinkExtensionData.handle,
-            async onChange(value) {
-                window.gadzoinkExtensionData.handle = value;
-                await callCustomHandler(value, window.gadzoinkExtensionData.authkey);
-            }
-        });
-        app.ui.settings.addSetting({
-            id: "Gadzoinks.authkey",
-            name: "Gadzoinks Authkey",
-            type: "text",
-            defaultValue: window.gadzoinkExtensionData.authkey,
-            async onChange(value) {
-                window.gadzoinkExtensionData.authkey = value;
-                await callCustomHandler(window.gadzoinkExtensionData.handle, value);
-            }
-        });
+        //callCustomHandler(window.gadzoinkExtensionData.handle,window.gadzoinkExtensionData.authkey);
+        gadzoinksGetAuth2();
+        
     },
-    setHandle(v) {
-        window.gadzoinkExtensionData.handle = v;
-        console.log("Handle updated:", v);
-    },
-
-    setAuthkey(v) {
-        window.gadzoinkExtensionData.authkey = v;
-    },
-	
-
+   
 });
 // Function to call the custom endpoint
-async function callCustomHandler(handle, authkey) {
+async function setBackendAccount(handle, authkey) {
     try {
         const response = await api.fetchApi(`/gadzoinks/setting?handle=${encodeURIComponent(handle)}&authkey=${encodeURIComponent(authkey)}`);
         return response;
@@ -96,24 +114,53 @@ async function callCustomHandler(handle, authkey) {
         return null;
     }
 }
-
+async function setbackendVariables(params = {}) {
+    const urlParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+        if (value != null) {  urlParams.append(key, value); }
+    }
+    // Only make the API call if we have at least one parameter
+    if (urlParams.toString()) {
+        const response = await api.fetchApi(`/gadzoinks/setting?${urlParams.toString()}`);
+        return response;
+    }
+    return null;
+}
 
 function gadzoinksShowAlert(event) {
     alert(event.detail.message);
 }
+
+//The backend asks us to call it with the handle and auth ( and everything else)
 function gadzoinksGetAuth(event) {
-    //const xh= app.ui.settings.getSettingValue("Comfy.gadzoinks.handle", window.gadzoinkExtensionData.handle);
-    //const xa = app.ui.settings.getSettingValue("Comfy.gadzoinks.authkey", window.gadzoinkExtensionData.authkey);
-    const xh= app.ui.settings.getSettingValue("Gadzoinks.handle" );
-    const xa = app.ui.settings.getSettingValue("Gadzoinks.authkey" );
+    gadzoinksGetAuth2();
+}
+function gadzoinksGetAuth2() {
+    const settingKeys = {
+        handle: "Gadzoinks.handle",
+        authkey: "Gadzoinks.authkey",
+        enableAPI: "Gadzoinks.enableapi",
+        qservermode: "Gadzoinks.qservermode",
+        serverName: "Gadzoinks.serverName",
+    };
+    const settings = Object.entries(settingKeys).reduce((acc, [key, settingKey]) => {
+        acc[key] = app.extensionManager.setting.get(settingKey);
+        return acc;
+    }, {});
+    const params = new URLSearchParams(
+        Object.entries(settings).map(([key, value]) => [key, value])
+    );
+
+    // Make the API call
+    const response = api.fetchApi(`/gadzoinks/setting?${params.toString()}`);
+}
+function OLDgadzoinksGetAuth(event) {
+    const xh= app.extensionManager.setting.get("Gadzoinks.handle" );
+    const xa = app.extensionManager.setting.get("Gadzoinks.authkey" );
     const response = api.fetchApi(`/gadzoinks/setting?handle=${encodeURIComponent(xh)}&authkey=${encodeURIComponent(xa)}`);
 }
 api.addEventListener("gadzoinks-show-alert",gadzoinksShowAlert);
 api.addEventListener("gadzoinks-get-auth",gadzoinksGetAuth);
-
-function dprint(...args) {
-  console.log(...args);
-}
 
 // This is for debugging only , and is not used
 const ext = {
@@ -130,11 +177,8 @@ const ext = {
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         // Run custom logic before a node definition is registered with the graph
         dprint("[logging]", "before register node: ", nodeType, nodeData);
-		callCustomHandler(app.ui.settings.getSettingValue("Gadzoinks.handle"),
-			app.ui.settings.getSettingValue("Gadzoinks.authkey"));
-        
-        // This fires for every node definition so only log once
-        //delete ext.beforeRegisterNodeDef;
+		setBackendAccount(app.extensionManager.setting.get("Gadzoinks.handle"),
+			app.extensionManager.setting.get("Gadzoinks.authkey"));
     },
     async registerCustomNodes(app) {
         // Register any custom node implementations here allowing for more flexability than a custom node def
@@ -144,9 +188,6 @@ const ext = {
         // Fires every time a node is constructed
         // You can modify widgets/add handlers/etc here
         dprint("[logging]", "node created: ", node);
-
-        // This fires for every node so only log once
-        //delete ext.nodeCreated;
     }
 };
 
@@ -433,3 +474,4 @@ function isNullEmptyOrNone(value) {
     }
     return false;
 }
+
