@@ -174,6 +174,8 @@ class SaveImageGadzoinks:
                     userToken = job.get('userToken')
             else:
                 dprint(f"save_images_gadzoinks: using handle/auth")
+                handle = global_state.handle
+                authkey = global_state.authkey
                 if not handle or not authkey:
                     PromptServer.instance.send_sync("gadzoinks-get-auth",{})
                     time.sleep(0.20) # prompt server is async, which will call python async
