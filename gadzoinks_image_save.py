@@ -116,9 +116,11 @@ class SaveImageGadzoinks:
                  "set_name": ("STRING",{"default":""}),
                 "images": ("IMAGE", {})
             },
+            "optional":{
+                "dynprompt": ("DYNPROMPT", {})
+            },
             "hidden": {
                 "unique_id": "UNIQUE_ID",
-                "dynprompt": "DYNPROMPT",
                 "prompt": "PROMPT",
                 "extra_pnginfo": "EXTRA_PNGINFO"
             }
@@ -130,7 +132,7 @@ class SaveImageGadzoinks:
     CATEGORY = "Gadzoinks"
     JAVASCRIPT = "gadzoinks.js"
 
-    def save_images_gadzoinks(self,upload_image , private_storage, age,set_name, images ,unique_id=None,dynprompt=None, prompt=None, extra_pnginfo=None):
+    def save_images_gadzoinks(self,upload_image , private_storage, age,set_name, images ,dynprompt=None,unique_id=None, prompt=None, extra_pnginfo=None):
         global_state = GlobalState.get_instance()
         self.handle = global_state.handle
         self.authkey = global_state.authkey
@@ -144,8 +146,43 @@ class SaveImageGadzoinks:
         
         #promptRC = PromptServer.instance.send_sync("gadzoinks-gadzoinks-current-prompt-id", {})
         #dprint(f"save_images_gadzoinks: promptRC:{promptRC} prompt_id:{global_state.prompt_id}")
-        
-        
+    
+        computed_prompt = None
+        if dynprompt is not None:
+            try:
+                from comfy_execution.graph import DynamicPrompt
+                # Check if dynprompt is a DynamicPrompt instance
+                if isinstance(dynprompt, DynamicPrompt):
+                    dprint("Found valid DynamicPrompt instance QAQ")
+                    # Search for GPromptsData nodes in the dynamic prompt
+                    dprint(f"dynprompt.all_node_ids: {dynprompt.all_node_ids() }")
+                    for node_id in dynprompt.all_node_ids():
+                        node = dynprompt.get_node(node_id)
+                        dprint(f"node {node_id} : {node}")
+                        # Look for our specific metadata nodes from GPrompts
+                        if "class_type" in node and node["class_type"] == "GPromptsData":
+                            if "data" in node:
+                                prompt_metadata = node["data"]
+                                dprint(f"Found gprompts metadata 1: {prompt_metadata} QAQ")
+                                # Add to our metadata
+                                computed_prompt = prompt_metadata.get("computed_prompt")
+                                dprint(f"computed_prompt:{computed_prompt}")
+                                break
+                else:
+                    # If dynprompt is not a DynamicPrompt instance but contains data
+                    dprint(f"dynprompt is not a DynamicPrompt instance: {type(dynprompt)} QAQ")
+                    dprint(f"dynprompt 2:{dynprompt}")
+                    if hasattr(dynprompt, 'original_prompt'):
+                        # It might be the original prompt object
+                        metadata["original_prompt"] = dynprompt.original_prompt
+            except Exception as e:
+                dprint(f"Error processing dynprompt: {str(e)}")
+
+
+
+        if computed_prompt:
+            dprint(f"Have computed_prompt:{computed_prompt} QAQ")
+
         isNewSet = False
         if set_name:
             if set_name != self.set_name:
@@ -160,6 +197,7 @@ class SaveImageGadzoinks:
         handle = global_state.api_handle if global_state.api_handle is not None else global_state.handle
         authkey = global_state.api_authkey if global_state.api_authkey is not None else global_state.authkey
         userToken = None
+        uuid = None
         n = prompt.get(f"{unique_id}")   # this is the gadzoinks node
         # check if we are uploading an image from an external job , in which case we use userToken not handle/auth
         if n:
@@ -174,13 +212,17 @@ class SaveImageGadzoinks:
                     userToken = job.get('userToken')
             else:
                 dprint(f"save_images_gadzoinks: using handle/auth")
-                handle = global_state.handle
-                authkey = global_state.authkey
+                # this is BAD code, we ask front end for handle/authkey, and wait for global_state to get updated
                 if not handle or not authkey:
                     PromptServer.instance.send_sync("gadzoinks-get-auth",{})
                     time.sleep(0.20) # prompt server is async, which will call python async
                     handle = global_state.handle
                     authkey = global_state.authkey
+                    if not handle or not authkey:
+                        PromptServer.instance.send_sync("gadzoinks-get-auth",{})
+                        time.sleep(0.80) # prompt server is async, which will call python async
+                        handle = global_state.handle
+                        authkey = global_state.authkey
                     dprint(f"save_images_gadzoinks: queried front end for auth. {handle} {authkey}")
                     if not handle or not authkey:
                         PromptServer.instance.send_sync("gadzoinks-show-alert",{"message":"Handle / Authkey not set, check settings."})
@@ -188,19 +230,23 @@ class SaveImageGadzoinks:
         dprint(f"save_images_gadzoinks: USING handle: {handle}, authkey: {authkey} userToken:{userToken}")
         filename_prefix = ""
         prompt_info = ""
-       
-        dprint(f"save_images_gadzoinks 15 {prompt}")
-        if prompt is not None:
-            #if prompt.get("uuid") is None:
-            #    prompt["uuid"] = ""
-            prompt_info = json.dumps(prompt)
-        dprint(f"save_images_gadzoinks 20")
         metadata = None
+        if prompt is not None:
+            if unique_id in prompt:
+                meta = prompt[unique_id].setdefault("_meta", {})
+                if computed_prompt:
+                    meta["computed_prompt"] = computed_prompt
+                if uuid:
+                    meta["uuid"] = uuid
+                prompt[unique_id]["_meta"] = meta
+            prompt_info = json.dumps(prompt)
         if not args.disable_metadata:
             metadata = {"prompt": prompt_info}
             if extra_pnginfo is not None:
                 for x in extra_pnginfo:
                     metadata[x] = json.dumps(extra_pnginfo[x])
+            
+        dprint(f"metadata for write {metadata}")
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         filename = f"gz_{filename}"
         results = list()
@@ -258,6 +304,8 @@ class SaveImageGadzoinks:
                 "extra" : extra,
                 "include_thumb" : 1
             }
+            if computed_prompt:
+                form_data["computed_prompt"] = computed_prompt
             if userToken:
                 form_data["userToken"] = userToken
             else:
@@ -770,8 +818,48 @@ def loadSettingsFromConfigFile():
             except json.JSONDecodeError:
                 dprint("Error parsing settings file - invalid JSON")
                 
+def get_local_url():
+    """Get the current ComfyUI server URL with the correct port"""
+    # Try to get the port from the server configuration
+    server_address = None
+    
+    try:
+        # Check if we can access the server's site object
+        if hasattr(PromptServer.instance, 'app') and hasattr(PromptServer.instance.app, '_state'):
+            # The server might have the port information in its state
+            for site in PromptServer.instance.app._state.sites:
+                if hasattr(site, '_server'):
+                    sockets = site._server.sockets
+                    if sockets:
+                        sock = sockets[0]
+                        # Get the actual port from the socket
+                        _, port = sock.getsockname()
+                        return f"http://localhost:{port}"
+    except Exception as e:
+        print(f"Error getting dynamic port: {e}")
+    
+    # Fallback: check environment variables or command line args
+    try:
+        # Check if port is specified in an environment variable
+        port = os.environ.get('COMFYUI_PORT')
+        if port:
+            return f"http://localhost:{port}"
+    except:
+        pass
+    
+    # Last resort: try to get the port from PromptServer if possible
+    try:
+        if hasattr(PromptServer.instance, 'port'):
+            return f"http://localhost:{PromptServer.instance.port}"
+    except:
+        pass
+    
+    # Ultimate fallback: use default ComfyUI port
+    return "http://localhost:8188"
+
 def find_route_handler(routes, method, path_pattern):
     """
+    I don't know where this code came from, and I'm not sure how to call a returned route - should delete so,eday
     Find the handler function for a specific route pattern.
     
     Args:
