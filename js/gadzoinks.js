@@ -5,13 +5,14 @@ import { ComfyWidgets } from "../../scripts/widgets.js";
 import { createElement as $el, getClosestOrSelf, setAttributes } from "./utils_dom.js";
 
 function dprint(...args) {
-  //console.log(...args);
+  // console.log(...args);
 }
 
 const extensionData = {
     handle: null,
     authkey: null
 };
+
 app.registerExtension({
     name: "gadzoinks.settings",
     settings: [
