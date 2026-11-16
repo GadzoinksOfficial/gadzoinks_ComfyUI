@@ -61,32 +61,42 @@ app.registerExtension({
     ],
     async setup() {
         console.log("Setting up Gadzoinks extension setup() foo");
+        // New-style menu button. The classes come from window.comfyAPI: importing
+        // the old button and buttonGroup script files is deprecated (issue #3).
         try {
-            // new style Manager buttons
-            let cmGroup = new (await import("../../scripts/ui/components/buttonGroup.js")).ComfyButtonGroup(
-                new(await import("../../scripts/ui/components/button.js")).ComfyButton({
-                     icon: "mdi mdi-link-variant",
-                     action: () => {
-                         gadzoinks_link();
-                     },
-                     tooltip: "Gadzoinks Link",
-                     content: "Gadzoinks",
-                     classList: "comfyui-button comfyui-menu-mobile-collapse primary"
-                }).element
+            const ComfyButton = window.comfyAPI?.button?.ComfyButton;
+            const ComfyButtonGroup = window.comfyAPI?.buttonGroup?.ComfyButtonGroup;
+            const anchor = app.menu?.settingsGroup?.element;
+            if (ComfyButton && ComfyButtonGroup && anchor) {
+                const cmGroup = new ComfyButtonGroup(
+                    new ComfyButton({
+                        icon: "mdi mdi-link-variant",
+                        action: () => {
+                            gadzoinks_link();
+                        },
+                        tooltip: "Gadzoinks Link",
+                        content: "Gadzoinks",
+                        classList: "comfyui-button comfyui-menu-mobile-collapse primary"
+                    }).element
                 );
-            app.menu?.settingsGroup.element.before(cmGroup.element);
-        }                                                              
+                anchor.before(cmGroup.element);
+            } else {
+                console.log("Gadzoinks: no new-style menu in this ComfyUI; using the toolbar button only.");
+            }
+        }
         catch(exception) {
-            console.log("ComfyUI is outdated. New style menu based features are disabled.");
+            console.log("Gadzoinks: could not add the menu button.", exception);
         }
         // This is for old UI with Toolbar
         const menu = document.querySelector(".comfy-menu");
-        const newButton = document.createElement("button");
-        newButton.textContent = "Gadzoinks 🔗";
-        newButton.onclick = () => {
-            gadzoinks_link();
-        };
-        menu.append(newButton);
+        if (menu) {
+            const newButton = document.createElement("button");
+            newButton.textContent = "Gadzoinks 🔗";
+            newButton.onclick = () => {
+                gadzoinks_link();
+            };
+            menu.append(newButton);
+        }
     },
     async init(app) {
 		console.log("Setting up Gadzoinks extension init()");
